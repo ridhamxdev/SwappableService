@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
-import { PORT } from './config';
+import { PORT, CORS_ORIGIN } from './config';
 import authRoutes from './routes/auth';
 import eventRoutes from './routes/events';
 import swapRoutes from './routes/swaps';
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
