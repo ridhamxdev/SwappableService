@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventStatus {
+  BUSY
+  SWAPPABLE
+  SWAP_PENDING
+}
+
+enum SwapStatus {
+  PENDING
+  REJECTED
+  ACCEPTED
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  passwordHash String
+  events       Event[]
+  requestsMade SwapRequest[] @relation("requestsMade")
+  requestsRecv SwapRequest[] @relation("requestsRecv")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Event {
+  id        Int         @id @default(autoincrement())
+  title     String
+  startTime DateTime
+  endTime   DateTime
+  status    EventStatus @default(BUSY)
+  userId    Int
+  owner     User        @relation(fields: [userId], references: [id])
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // back-relations for SwapRequest
+  swapRequestsAsMine   SwapRequest[] @relation("mySlot")
+  swapRequestsAsTheirs SwapRequest[] @relation("theirSlot")
+}
+
+model SwapRequest {
+  id          Int        @id @default(autoincrement())
+  mySlotId    Int
+  theirSlotId Int
+  requesterId Int
+  responderId Int
+  status      SwapStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+
+  mySlot    Event @relation("mySlot", fields: [mySlotId], references: [id])
+  theirSlot Event @relation("theirSlot", fields: [theirSlotId], references: [id])
+
+  requester User @relation("requestsMade", fields: [requesterId], references: [id])
+  responder User @relation("requestsRecv", fields: [responderId], references: [id])
+}
