@@ -1,13 +1,11 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
-
 router.use(requireAuth);
 
-// GET /api/swappable-slots
-router.get('/swappable-slots', async (req, res) => {
+router.get('/swappable-slots', async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const slots = await prisma.event.findMany({
     where: { status: 'SWAPPABLE', NOT: { userId } },
@@ -17,10 +15,9 @@ router.get('/swappable-slots', async (req, res) => {
   res.json(slots);
 });
 
-// POST /api/swap-request
-router.post('/swap-request', async (req, res) => {
+router.post('/swap-request', async (req: Request, res: Response) => {
   const requesterId = req.user!.userId;
-  const { mySlotId, theirSlotId } = req.body;
+  const { mySlotId, theirSlotId } = req.body as { mySlotId?: number; theirSlotId?: number };
   if (!mySlotId || !theirSlotId) return res.status(400).json({ error: 'Missing slot ids' });
 
   const mySlot = await prisma.event.findFirst({ where: { id: mySlotId, userId: requesterId } });
@@ -49,8 +46,7 @@ router.post('/swap-request', async (req, res) => {
   res.status(201).json(swap);
 });
 
-// POST /api/swap-response/:requestId
-router.post('/swap-response/:requestId', async (req, res) => {
+router.post('/swap-response/:requestId', async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const requestId = parseInt(req.params.requestId, 10);
   const { accept } = req.body as { accept: boolean };
@@ -69,7 +65,6 @@ router.post('/swap-response/:requestId', async (req, res) => {
     return res.json({ ok: true, status: 'REJECTED' });
   }
 
-  // Accept flow: exchange owners, set BUSY, mark request ACCEPTED
   await prisma.$transaction(async (tx) => {
     const mySlot = await tx.event.findUnique({ where: { id: sr.mySlotId } });
     const theirSlot = await tx.event.findUnique({ where: { id: sr.theirSlotId } });
@@ -77,19 +72,15 @@ router.post('/swap-response/:requestId', async (req, res) => {
     if (mySlot.status !== 'SWAP_PENDING' || theirSlot.status !== 'SWAP_PENDING') {
       throw new Error('Slots not pending');
     }
-
-    // Swap owners
     await tx.event.update({ where: { id: mySlot.id }, data: { userId: sr.responderId, status: 'BUSY' } });
     await tx.event.update({ where: { id: theirSlot.id }, data: { userId: sr.requesterId, status: 'BUSY' } });
-
     await tx.swapRequest.update({ where: { id: requestId }, data: { status: 'ACCEPTED' } });
   });
 
   res.json({ ok: true, status: 'ACCEPTED' });
 });
 
-// Extra helpers
-router.get('/requests', async (req, res) => {
+router.get('/requests', async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const incoming = await prisma.swapRequest.findMany({
     where: { responderId: userId },
